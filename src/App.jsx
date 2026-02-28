@@ -191,9 +191,9 @@ function MapView({ locations, route, onToggleVisited }) {
 
   useEffect(() => {
     if (mapRef.current && !leafletMap.current) {
-      leafletMap.current = L.map(mapRef.current, { zoomControl: true }).setView([20, 0], 2);
+      leafletMap.current = L.map(mapRef.current, { zoomControl: true, attributionControl: false }).setView([20, 0], 2);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "© OpenStreetMap contributors",
+        attribution: "",
         maxZoom: 19,
       }).addTo(leafletMap.current);
     }
