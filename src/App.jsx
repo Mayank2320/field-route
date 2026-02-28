@@ -55,7 +55,7 @@ async function loadAllDays() {
 // GEOCODING
 // ============================================================
 async function geocodeAddress(address) {
-  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address + ", Surat, Gujarat, India")}&format=json&limit=1`;
+  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&countrycodes=in&viewbox=72.6,21.4,73.1,20.9&bounded=0`;
   const res = await fetch(url, { headers: { "Accept-Language": "en" } });
   const data = await res.json();
   if (!data.length) throw new Error("Address not found");
@@ -340,10 +340,19 @@ if (isNaN(coords.lat) || isNaN(coords.lng)) throw new Error("Could not parse coo
     for (let i = 0; i < lines.length; i++) {
       setStatus(`Geocoding ${i + 1}/${lines.length}...`);
       try {
-        const geo = await geocodeAddress(lines[i]);
-        results.push({ id: crypto.randomUUID(), address: lines[i], name: lines[i].split(",")[0], lat: geo.lat, lng: geo.lng, visited: false, optimizedIndex: undefined });
-        await new Promise(r => setTimeout(r, 1000));
-      } catch { await new Promise(r => setTimeout(r, 500)); }
+  const gmatch =
+    lines[i].match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) ||
+    lines[i].match(/place\/(-?\d+\.\d+),(-?\d+\.\d+)/) ||
+    lines[i].match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  const geo = gmatch
+    ? { lat: parseFloat(gmatch[1]), lng: parseFloat(gmatch[2]) }
+    : await geocodeAddress(lines[i]);
+  const name = gmatch
+    ? (lines[i].split("\n")[0].substring(0, 30) || "Shop")
+    : lines[i].split(",")[0];
+  results.push({ id: crypto.randomUUID(), address: lines[i], name, lat: geo.lat, lng: geo.lng, visited: false, optimizedIndex: undefined });
+  if (!gmatch) await new Promise(r => setTimeout(r, 1000));
+} catch { await new Promise(r => setTimeout(r, 500)); }
     }
     updateCurrentDay(d => ({ ...d, locations: [...d.locations, ...results], optimizedOrder: null, routeGeometry: null }));
     setBulkInput(""); setShowBulk(false); setGeocoding(false);
