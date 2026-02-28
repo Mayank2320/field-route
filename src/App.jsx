@@ -279,11 +279,15 @@ const googleMatch =
 
 let geo;
 if (googleMatch) {
-  geo = { lat: parseFloat(googleMatch[1]), lng: parseFloat(googleMatch[2]) };
+  const lat = parseFloat(googleMatch[1]);
+  const lng = parseFloat(googleMatch[2]);
+  if (isNaN(lat) || isNaN(lng)) throw new Error("Invalid coordinates in link");
+  geo = { lat, lng };
 } else {
   geo = await geocodeAddress(address);
 }
-    const coords = { lat: geo.lat, lng: geo.lng };
+const coords = { lat: geo.lat, lng: geo.lng };
+if (isNaN(coords.lat) || isNaN(coords.lng)) throw new Error("Could not parse coordinates");
     if (type === "home") {
       setHomeCoords(coords);
       localStorage.setItem("frp_home", address);
@@ -296,7 +300,7 @@ if (googleMatch) {
       setStatus("✓ Office saved");
     }
   } catch (e) {
-    setStatus(`✗ Could not find ${type} address`);
+    setStatus(`✗ ${e.message}`);
   }
 };
   const navigateNextStop = () => {
