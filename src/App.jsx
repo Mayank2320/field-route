@@ -250,15 +250,24 @@ const [officeCoords, setOfficeCoords] = useState(() => {
   }, []);
 
   const currentDay = dayData[activeDay];
-  const sortedLocs = [...currentDay.locations].sort((a, b) => {
-    if (a.optimizedIndex == null && b.optimizedIndex == null) return 0;
-    if (a.optimizedIndex == null) return 1;
-    if (b.optimizedIndex == null) return -1;
-    return a.optimizedIndex - b.optimizedIndex;
-  });
+  const sortedMiddle = [...currentDay.locations].sort((a, b) => {
+  if (a.optimizedIndex == null && b.optimizedIndex == null) return 0;
+  if (a.optimizedIndex == null) return 1;
+  if (b.optimizedIndex == null) return -1;
+  return a.optimizedIndex - b.optimizedIndex;
+});
+
+const sortedLocs = [
+  ...(currentDay.startLoc ? [{ ...currentDay.startLoc, optimizedIndex: 0 }] : []),
+  ...sortedMiddle,
+  ...(currentDay.endLoc ? [{ ...currentDay.endLoc, optimizedIndex: 9999 }] : []),
+];
   const visited = currentDay.locations.filter(l => l.visited).length;
-  const pending = currentDay.locations.length - visited;
-  const progress = currentDay.locations.length ? (visited / currentDay.locations.length) * 100 : 0;
+const pending = currentDay.locations.length - visited;
+const progress = currentDay.locations.length ? (visited / currentDay.locations.length) * 100 : 0;
+const totalStopsCount = currentDay.locations.length
+  + (currentDay.startLoc ? 1 : 0)
+  + (currentDay.endLoc ? 1 : 0);
 
   const updateCurrentDay = useCallback((updater) => {
     setDayData(prev => {
@@ -390,11 +399,17 @@ if (startLoc && endLoc && middleLocs.length >= 1) {
       setStatus("Fetching route path...");
       const routeData = await getRouteGeometry(orderedLocs);
       updateCurrentDay(d => ({
-        ...d,
-        locations: d.locations.map(l => indexMap[l.id] !== undefined ? { ...l, optimizedIndex: indexMap[l.id] } : l),
-        optimizedOrder: order, routeGeometry: routeData?.coordinates || null,
-        totalTime, totalDist: routeData?.distance || 0,
-      }));
+  ...d,
+  locations: d.locations.map(l =>
+    indexMap[l.id] !== undefined ? { ...l, optimizedIndex: indexMap[l.id] } : l
+  ),
+  optimizedOrder: order,
+  routeGeometry: routeData?.coordinates || null,
+  totalTime,
+  totalDist: routeData?.distance || 0,
+  startLoc: startLoc || null,
+  endLoc: endLoc || null,
+}));
       setStatus(`✓ ${fmtDist(routeData?.distance)} · ${fmtTime(routeData?.duration)} · ${locs.length} stops`);
     } catch (e) { setStatus(`✗ ${e.message}`); }
     finally { setOptimizing(false); }
@@ -539,7 +554,7 @@ if (startLoc && endLoc && middleLocs.length >= 1) {
         <div className="bottom-panel">
           <div className="stats-bar">
             <div className="stat-cell">
-              <div className="stat-v">{currentDay.locations.length}</div>
+              <div className="stat-v">{totalStopsCount}</div>
               <div className="stat-l">Stops</div>
             </div>
             <div className="stat-cell">
@@ -592,22 +607,36 @@ if (startLoc && endLoc && middleLocs.length >= 1) {
                     <div className="empty-icon">🗺️</div>
                     <div className="empty-text">No stops yet.<br />Tap <strong>+ Add Stop</strong> to begin.</div>
                   </div>
-                ) : sortedLocs.map((loc, idx) => (
-                  <div key={loc.id} className={`loc-item ${loc.visited ? "visited" : ""}`}>
-                    <div className="loc-num">{idx + 1}</div>
-                    <div className="loc-info">
-                      <div className="loc-name">{loc.name}</div>
-                      <div className="loc-addr">{loc.address}</div>
-                    </div>
-                    <div className="loc-actions">
-                      <button className={`icon-btn ${loc.visited ? "done" : ""}`} onClick={() => toggleVisited(loc.id)}>
-                        {loc.visited ? "✓" : "○"}
-                      </button>
-                      <a href={`https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`} target="_blank" rel="noopener noreferrer" className="icon-btn nav-btn">↗</a>
-                      <button className="icon-btn del" onClick={() => removeLocation(loc.id)}>×</button>
-                    </div>
-                  </div>
-                ))}
+                ) : sortedLocs.map((loc, idx) => {
+  const isFixed = loc.id === "__home__" || loc.id === "__office__";
+  return (
+    <div key={loc.id} className={`loc-item ${loc.visited ? "visited" : ""}`}
+      style={isFixed ? { borderColor: "#3b4a6b", background: "#0e1628" } : {}}>
+      <div className="loc-num"
+        style={isFixed ? { background: "#3b82f6", fontSize: 9 } : {}}>
+        {loc.id === "__home__" ? "🏠" : loc.id === "__office__" ? "🏢" : idx + 1}
+      </div>
+      <div className="loc-info">
+        <div className="loc-name">{loc.name}</div>
+        <div className="loc-addr">{isFixed ? "Fixed point" : loc.address}</div>
+      </div>
+      <div className="loc-actions">
+        {!isFixed && (
+          <>
+            <button className={`icon-btn ${loc.visited ? "done" : ""}`} onClick={() => toggleVisited(loc.id)}>
+              {loc.visited ? "✓" : "○"}
+            </button>
+            <a href={`https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`} target="_blank" rel="noopener noreferrer" className="icon-btn nav-btn">↗</a>
+            <button className="icon-btn del" onClick={() => removeLocation(loc.id)}>×</button>
+          </>
+        )}
+        {isFixed && (
+          <a href={`https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`} target="_blank" rel="noopener noreferrer" className="icon-btn nav-btn">↗</a>
+        )}
+      </div>
+    </div>
+  );
+})}
               </div>
             )}
             {activeTab === "settings" && (
