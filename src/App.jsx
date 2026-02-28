@@ -528,13 +528,14 @@ const willBeVisited = !loc.visited;
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body, #root { height: 100%; }
+        html, body { height: 100%; margin: 0; padding: 0; }
+#root { height: 100%; display: flex; flex-direction: column; }
         body { font-family: 'Syne', sans-serif; background: #0c0f14; color: #e8e3db; }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: #1a1f2a; }
         ::-webkit-scrollbar-thumb { background: #f97316; border-radius: 2px; }
         
-        .app { display: flex; flex-direction: column; height: 100vh; overflow: hidden;}
+        .app { display: flex; flex-direction: column; height: 100%; overflow: hidden;}
         
         .header { 
           padding: 12px 16px 0;
@@ -744,7 +745,10 @@ const willBeVisited = !loc.visited;
           flex-shrink: 0;
         }
         .loc-item.visited .loc-num { background: #22c55e; }
-        
+        .leaflet-container { 
+  width: 100% !important; 
+  height: 100% !important; 
+}
         .loc-info { flex: 1; min-width: 0; }
         .loc-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .loc-addr { font-size: 11px; color: #4b5563; font-family: 'DM Mono', monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
@@ -783,8 +787,10 @@ const willBeVisited = !loc.visited;
 }
 .right-panel.fullscreen { 
   position: fixed; 
-  top: 0; left: 0; right: 0; bottom: 0; 
-  height: 100dvh !important; 
+  top: 0; left: 0; 
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
   z-index: 9999; 
 }
         
@@ -862,7 +868,12 @@ const willBeVisited = !loc.visited;
               onToggleVisited={toggleVisited}
             />
             <button
-              onClick={() => setMapFullscreen(v => !v)}
+              onClick={() => {
+  setMapFullscreen(v => !v);
+  setTimeout(() => {
+    window.dispatchEvent(new Event('resize'));
+  }, 100);
+}}
               style={{
                 position: "absolute", top: 10, right: 10, zIndex: 1000,
                 background: "#0c0f14", border: "1px solid #f97316",
