@@ -297,7 +297,10 @@ const [officeCoords, setOfficeCoords] = useState(() => {
   const addLocation = async () => {
     const addr = addressInput.trim();
     if (!addr) return;
-    const googleMatch = addr.match(/place\/(-?\d+\.\d+),(-?\d+\.\d+)/) || addr.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    const googleMatch =
+  addr.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) ||
+  addr.match(/place\/(-?\d+\.\d+),(-?\d+\.\d+)/) ||
+  addr.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
     if (googleMatch) {
       const loc = { id: crypto.randomUUID(), address: addr, name: nameInput.trim() || "Shop", lat: parseFloat(googleMatch[1]), lng: parseFloat(googleMatch[2]), visited: false, optimizedIndex: undefined };
       updateCurrentDay(d => ({ ...d, locations: [...d.locations, loc], optimizedOrder: null, routeGeometry: null }));
