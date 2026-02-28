@@ -533,7 +533,7 @@ const willBeVisited = !loc.visited;
         ::-webkit-scrollbar-track { background: #1a1f2a; }
         ::-webkit-scrollbar-thumb { background: #f97316; border-radius: 2px; }
         
-        .app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        .app { display: flex; flex-direction: column; min-height: 100vh; }
         
         .header { 
           padding: 12px 16px 0;
@@ -780,45 +780,25 @@ const willBeVisited = !loc.visited;
         
         /* MOBILE */
         @media (max-width: 768px) {
-          .left-panel {
-            position: absolute;
-            bottom: 0;
-            left: 0; right: 0;
-            width: 100%;
-            height: 60%;
-            border-right: none;
-            border-top: 1px solid #1e2633;
-            z-index: 1000;
-            transform: translateY(0);
-            transition: transform 0.3s;
-          }
-          .left-panel.hidden { transform: translateY(100%); }
-          .right-panel { width: 100%; }
-          .mobile-toggle {
-            position: absolute;
-            bottom: 16px; right: 16px;
-            z-index: 1001;
-            background: #f97316;
-            color: #0c0f14;
-            border: none;
-            border-radius: 50%;
-            width: 52px; height: 52px;
-            font-size: 22px;
-            cursor: pointer;
-            box-shadow: 0 4px 16px rgba(249,115,22,0.5);
-            display: flex; align-items: center; justify-content: center;
-          }
-          .mobile-toggle.map-mode { background: #1e2633; color: #e8e3db; }
-        }
-        @media (min-width: 769px) {
-          .mobile-toggle { display: none; }
-          .left-panel { position: relative !important; transform: none !important; }
-        }
 
-        .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid #f97316; border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; margin-right: 6px; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        
-        .bulk-toggle { font-size: 11px; color: #f97316; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-block; }
+  .body {
+    flex-direction: column;
+  }
+
+  .right-panel {
+    height: 40%;
+  }
+
+  .left-panel {
+    position: relative;
+    width: 100%;
+    height: 60%;
+    border-right: none;
+    border-top: 1px solid #1e2633;
+    transform: none;
+  }
+
+} 2px; margin-top: 4px; display: inline-block; }
       `}</style>
 
       {/* Load Leaflet */}
@@ -1006,14 +986,6 @@ const willBeVisited = !loc.visited;
               onToggleVisited={toggleVisited}
             />
           </div>
-
-          {/* MOBILE TOGGLE */}
-          <button
-            className={`mobile-toggle ${mobileView === "map" ? "map-mode" : ""}`}
-            onClick={() => setMobileView(v => v === "list" ? "map" : "list")}
-          >
-            {mobileView === "map" ? "☰" : "🗺"}
-          </button>
         </div>
       </div>
     </>
