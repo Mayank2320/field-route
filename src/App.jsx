@@ -226,7 +226,16 @@ export default function App() {
   const [dbReady, setDbReady] = useState(false);
   const [mapFullscreen, setMapFullscreen] = useState(false);
   const [activeTab, setActiveTab] = useState("list");
-
+  const [homeAddress, setHomeAddress] = useState(() => localStorage.getItem("frp_home") || "");
+const [officeAddress, setOfficeAddress] = useState(() => localStorage.getItem("frp_office") || "");
+const [homeCoords, setHomeCoords] = useState(() => {
+  const s = localStorage.getItem("frp_home_coords");
+  return s ? JSON.parse(s) : null;
+});
+const [officeCoords, setOfficeCoords] = useState(() => {
+  const s = localStorage.getItem("frp_office_coords");
+  return s ? JSON.parse(s) : null;
+});
   useEffect(() => {
     loadAllDays().then(rows => {
       if (rows.length) {
@@ -258,7 +267,35 @@ export default function App() {
       return updated;
     });
   }, [activeDay]);
-
+  const saveHomeOffice = async (type, address) => {
+  setStatus(`Saving ${type}...`);
+  try {
+    const gm =
+      address.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) ||
+      address.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) ||
+      address.match(/place\/(-?\d+\.\d+),(-?\d+\.\d+)/);
+    let geo;
+    if (gm) {
+      const lat = parseFloat(gm[1]), lng = parseFloat(gm[2]);
+      if (isNaN(lat) || isNaN(lng)) throw new Error("Invalid coordinates");
+      geo = { lat, lng };
+    } else {
+      geo = await geocodeAddress(address);
+    }
+    const coords = { lat: geo.lat, lng: geo.lng };
+    if (type === "home") {
+      setHomeCoords(coords);
+      localStorage.setItem("frp_home", address);
+      localStorage.setItem("frp_home_coords", JSON.stringify(coords));
+      setStatus("✓ Home saved");
+    } else {
+      setOfficeCoords(coords);
+      localStorage.setItem("frp_office", address);
+      localStorage.setItem("frp_office_coords", JSON.stringify(coords));
+      setStatus("✓ Office saved");
+    }
+  } catch (e) { setStatus(`✗ ${e.message}`); }
+};
   const navigateNextStop = () => {
     const next = sortedLocs.find(l => !l.visited);
     if (!next) { setStatus("✓ All locations completed!"); return; }
@@ -268,7 +305,10 @@ export default function App() {
   const addLocation = async () => {
     const addr = addressInput.trim();
     if (!addr) return;
-    const googleMatch = addr.match(/place\/(-?\d+\.\d+),(-?\d+\.\d+)/) || addr.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    const googleMatch =
+  addr.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) ||
+  addr.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) ||
+  addr.match(/place\/(-?\d+\.\d+),(-?\d+\.\d+)/);
     if (googleMatch) {
       const loc = { id: crypto.randomUUID(), address: addr, name: nameInput.trim() || "Shop", lat: parseFloat(googleMatch[1]), lng: parseFloat(googleMatch[2]), visited: false, optimizedIndex: undefined };
       updateCurrentDay(d => ({ ...d, locations: [...d.locations, loc], optimizedOrder: null, routeGeometry: null }));
@@ -293,10 +333,17 @@ export default function App() {
     for (let i = 0; i < lines.length; i++) {
       setStatus(`Geocoding ${i + 1}/${lines.length}...`);
       try {
-        const geo = await geocodeAddress(lines[i]);
-        results.push({ id: crypto.randomUUID(), address: lines[i], name: lines[i].split(",")[0], lat: geo.lat, lng: geo.lng, visited: false, optimizedIndex: undefined });
-        await new Promise(r => setTimeout(r, 1000));
-      } catch { await new Promise(r => setTimeout(r, 500)); }
+  const gmatch =
+    lines[i].match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) ||
+    lines[i].match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) ||
+    lines[i].match(/place\/(-?\d+\.\d+),(-?\d+\.\d+)/);
+  const geo = gmatch
+    ? { lat: parseFloat(gmatch[1]), lng: parseFloat(gmatch[2]) }
+    : await geocodeAddress(lines[i]);
+  const name = gmatch ? "Shop" : lines[i].split(",")[0];
+  results.push({ id: crypto.randomUUID(), address: lines[i], name, lat: geo.lat, lng: geo.lng, visited: false, optimizedIndex: undefined });
+  if (!gmatch) await new Promise(r => setTimeout(r, 1000));
+} catch { await new Promise(r => setTimeout(r, 500)); }
     }
     updateCurrentDay(d => ({ ...d, locations: [...d.locations, ...results], optimizedOrder: null, routeGeometry: null }));
     setBulkInput(""); setShowBulk(false); setGeocoding(false);
@@ -304,17 +351,44 @@ export default function App() {
   };
 
   const optimizeRoute = async () => {
-    const locs = currentDay.locations;
-    if (locs.length < 2) { setStatus("Need at least 2 locations"); return; }
+    const middleLocs = currentDay.locations;
+if (middleLocs.length < 1) { setStatus("Need at least 1 location"); return; }
+const startLoc = homeCoords ? { id: "__home__", name: "🏠 Home", address: homeAddress, lat: homeCoords.lat, lng: homeCoords.lng, visited: false, optimizedIndex: undefined } : null;
+const endLoc = officeCoords ? { id: "__office__", name: "🏢 Office", address: officeAddress, lat: officeCoords.lat, lng: officeCoords.lng, visited: false, optimizedIndex: undefined } : null;
+const locs = [...(startLoc ? [startLoc] : []), ...middleLocs, ...(endLoc ? [endLoc] : [])];
     setOptimizing(true); setStatus("Building distance matrix...");
     try {
       const matrix = await getDistanceMatrix(locs);
       setStatus("Solving optimal route...");
-      const { order, totalTime } = solveTSP(matrix);
+      let order, totalTime;
+if (startLoc && endLoc && middleLocs.length >= 1) {
+  const n = middleLocs.length;
+  const subMatrix = matrix.slice(1, 1 + n).map(row => row.slice(1, 1 + n));
+  let bestMiddle = Array.from({ length: n }, (_, i) => i);
+  let bestTime = Infinity;
+  for (let s = 0; s < n; s++) {
+    const vis = new Array(n).fill(false);
+    const ord = [s]; vis[s] = true; let cur = s, t = 0;
+    for (let i = 1; i < n; i++) {
+      let near = -1, nearD = Infinity;
+      for (let j = 0; j < n; j++) {
+        if (!vis[j] && subMatrix[cur][j] < nearD) { nearD = subMatrix[cur][j]; near = j; }
+      }
+      if (near === -1) break;
+      vis[near] = true; ord.push(near); t += nearD; cur = near;
+    }
+    const cost = matrix[0][ord[0] + 1] + t + matrix[ord[ord.length - 1] + 1][locs.length - 1];
+    if (cost < bestTime) { bestTime = cost; bestMiddle = [...ord]; }
+  }
+  order = [0, ...bestMiddle.map(i => i + 1), locs.length - 1];
+  totalTime = bestTime;
+} else {
+  ({ order, totalTime } = solveTSP(matrix));
+}
       const orderedLocs = order.map((idx, pos) => ({ ...locs[idx], optimizedIndex: pos }));
+      const indexMap = Object.fromEntries(orderedLocs.map(l => [l.id, l.optimizedIndex]));
       setStatus("Fetching route path...");
       const routeData = await getRouteGeometry(orderedLocs);
-      const indexMap = Object.fromEntries(orderedLocs.map(l => [l.id, l.optimizedIndex]));
       updateCurrentDay(d => ({
         ...d,
         locations: d.locations.map(l => indexMap[l.id] !== undefined ? { ...l, optimizedIndex: indexMap[l.id] } : l),
@@ -505,6 +579,9 @@ export default function App() {
             <button className={`panel-tab ${activeTab === "add" ? "active" : ""}`} onClick={() => setActiveTab("add")}>
               + Add Stop
             </button>
+            <button className={`panel-tab ${activeTab === "settings" ? "active" : ""}`} onClick={() => setActiveTab("settings")}>
+  ⚙ Routes
+</button>
           </div>
 
           <div className="scroll-area">
@@ -533,7 +610,18 @@ export default function App() {
                 ))}
               </div>
             )}
-
+            {activeTab === "settings" && (
+  <div className="add-form">
+    <div style={{ fontSize: 11, color: "#4b5563", fontFamily: "'DM Mono',monospace", marginBottom: 4 }}>🏠 HOME — Start Point</div>
+    <input className="field" placeholder="Home address or paste Google Maps link" value={homeAddress} onChange={e => setHomeAddress(e.target.value)} />
+    <button className="btn-add" onClick={() => saveHomeOffice("home", homeAddress)} disabled={!homeAddress.trim()}>Save Home</button>
+    {homeCoords && <div style={{ fontSize: 10, color: "#22c55e", fontFamily: "'DM Mono',monospace" }}>✓ Saved: {homeAddress.substring(0, 40)}</div>}
+    <div style={{ fontSize: 11, color: "#4b5563", fontFamily: "'DM Mono',monospace", marginBottom: 4, marginTop: 12 }}>🏢 OFFICE — End Point</div>
+    <input className="field" placeholder="Office address or paste Google Maps link" value={officeAddress} onChange={e => setOfficeAddress(e.target.value)} />
+    <button className="btn-add" onClick={() => saveHomeOffice("office", officeAddress)} disabled={!officeAddress.trim()}>Save Office</button>
+    {officeCoords && <div style={{ fontSize: 10, color: "#22c55e", fontFamily: "'DM Mono',monospace" }}>✓ Saved: {officeAddress.substring(0, 40)}</div>}
+  </div>
+)}
             {activeTab === "add" && (
               <div className="add-form">
                 <input className="field" placeholder="Shop / party name (optional)" value={nameInput} onChange={e => setNameInput(e.target.value)} />
