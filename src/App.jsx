@@ -297,6 +297,7 @@ export default function App() {
   const [geocoding, setGeocoding] = useState(false);
   const [dbReady, setDbReady] = useState(false);
   const [mobileView, setMobileView] = useState("list"); // "list" | "map"
+  const [mapFullscreen, setMapFullscreen] = useState(false);
 
   // Load from IndexedDB on mount
   useEffect(() => {
@@ -533,7 +534,7 @@ const willBeVisited = !loc.visited;
         ::-webkit-scrollbar-track { background: #1a1f2a; }
         ::-webkit-scrollbar-thumb { background: #f97316; border-radius: 2px; }
         
-        .app { display: flex; flex-direction: column; height: 100vh; }
+        .app { display: flex; flex-direction: column; height: 100vh; overflow: hidden;}
         
         .header { 
           padding: 12px 16px 0;
@@ -586,7 +587,7 @@ const willBeVisited = !loc.visited;
         }
         .day-tab.active .badge { background: #2c1810; color: #f97316; }
         
-        .body { display: flex; flex: 1; overflow: hidden; }
+        .body { display: flex; flex: 1; overflow: hidden; min-height: 0; flex-direction: column; }
         
         /* LEFT PANEL */
         .left-panel {
@@ -693,7 +694,8 @@ const willBeVisited = !loc.visited;
           height: 100%; background: linear-gradient(90deg, #22c55e, #16a34a);
           transition: width 0.4s;
         }
-        
+        .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid #f97316; border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; margin-right: 6px; vertical-align: middle; }
+@keyframes spin { to { transform: rotate(360deg); } }
         .status-bar {
           padding: 8px 16px;
           font-family: 'DM Mono', monospace;
@@ -772,32 +774,36 @@ const willBeVisited = !loc.visited;
         .empty-state-text { font-size: 13px; line-height: 1.6; }
         
         /* RIGHT PANEL / MAP */
-        .right-panel {
-          flex: 1;
-          position: relative;
-          overflow: hidden;
-        }
+        .right-panel { 
+  position: relative; 
+  overflow: hidden; 
+  height: 38vh;
+  flex-shrink: 0;
+}
+.right-panel.fullscreen { 
+  position: fixed; 
+  top: 0; left: 0; right: 0; bottom: 0; 
+  height: 100dvh !important; 
+  z-index: 9999; 
+}
         
         /* MOBILE */
-        @media (max-width: 768px) {
-
-  .body {
-    flex-direction: column;
-    height: calc(100vh - 110px); /* header + status approx */
-  }
-
-  .right-panel {
-    flex: 1;
-  }
-
+/* REPLACE WITH THIS */
+@media (max-width: 768px) {
   .left-panel {
     flex: 1;
-    position: relative;
     width: 100%;
+    min-width: unset;
     border-right: none;
     border-top: 1px solid #1e2633;
+    overflow-y: auto;
+    min-height: 0;
   }
-
+  .left-panel.hidden { display: none; }
+  .mobile-toggle { display: none; }
+}
+@media (min-width: 769px) {
+  .right-panel { height: auto !important; flex: 1; }
 }
       `}</style>
 
@@ -979,13 +985,25 @@ const willBeVisited = !loc.visited;
           </div>
 
           {/* MAP PANEL */}
-          <div className="right-panel">
-            <MapView
-              locations={sortedLocs}
-              route={currentDay.routeGeometry}
-              onToggleVisited={toggleVisited}
-            />
-          </div>
+          <div className={`right-panel ${mapFullscreen ? "fullscreen" : ""}`}>
+  <MapView
+    locations={sortedLocs}
+    route={currentDay.routeGeometry}
+    onToggleVisited={toggleVisited}
+  />
+  <button
+    onClick={() => setMapFullscreen(v => !v)}
+    style={{
+      position: "absolute", top: 10, right: 10, zIndex: 1000,
+      background: "#0c0f14", border: "1px solid #f97316",
+      color: "#f97316", borderRadius: 6, padding: "5px 10px",
+      fontFamily: "'DM Mono', monospace", fontSize: 11,
+      cursor: "pointer"
+    }}
+  >
+    {mapFullscreen ? "✕ Exit" : "⤢ Full"}
+  </button>
+</div>
         </div>
       </div>
     </>
