@@ -271,7 +271,18 @@ const [officeCoords, setOfficeCoords] = useState(() => {
   const saveHomeOffice = async (type, address) => {
   setStatus(`Geocoding ${type}...`);
   try {
-    const geo = await geocodeAddress(address);
+    // Check if it's a Google Maps link first
+const googleMatch =
+  address.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) ||
+  address.match(/place\/(-?\d+\.\d+),(-?\d+\.\d+)/) ||
+  address.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+
+let geo;
+if (googleMatch) {
+  geo = { lat: parseFloat(googleMatch[1]), lng: parseFloat(googleMatch[2]) };
+} else {
+  geo = await geocodeAddress(address);
+}
     const coords = { lat: geo.lat, lng: geo.lng };
     if (type === "home") {
       setHomeCoords(coords);
