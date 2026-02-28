@@ -275,7 +275,17 @@ useEffect(() => {
     };
   }, [locations, route]);
 
-  return <div ref={mapRef} style={{ width: "100%", height: "100%" }} />;
+  useEffect(() => {
+  const handler = () => {
+    if (leafletMap.current) {
+      setTimeout(() => leafletMap.current.invalidateSize(), 100);
+    }
+  };
+  window.addEventListener('resize', handler);
+  return () => window.removeEventListener('resize', handler);
+}, []);
+
+return <div ref={mapRef} style={{ width: "100%", height: "100%" }} />;
 }
 
 // ============================================================
@@ -795,7 +805,6 @@ const willBeVisited = !loc.visited;
 }
         
         /* MOBILE */
-/* REPLACE WITH THIS */
 @media (max-width: 768px) {
   .left-panel {
     flex: 1;
@@ -803,6 +812,14 @@ const willBeVisited = !loc.visited;
     min-width: unset;
     border-right: none;
     border-top: 1px solid #1e2633;
+    overflow-y: auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .left-panel .location-list {
+    flex: 1;
     overflow-y: auto;
     min-height: 0;
   }
@@ -872,8 +889,10 @@ const willBeVisited = !loc.visited;
   setMapFullscreen(v => !v);
   setTimeout(() => {
     window.dispatchEvent(new Event('resize'));
-  }, 100);
+  if (leafletMap.current) leafletMap.current.invalidateSize();
+  }, 150);
 }}
+
               style={{
                 position: "absolute", top: 10, right: 10, zIndex: 1000,
                 background: "#0c0f14", border: "1px solid #f97316",
