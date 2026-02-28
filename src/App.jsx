@@ -533,7 +533,7 @@ const willBeVisited = !loc.visited;
         ::-webkit-scrollbar-track { background: #1a1f2a; }
         ::-webkit-scrollbar-thumb { background: #f97316; border-radius: 2px; }
         
-        .app { display: flex; flex-direction: column; min-height: 100vh; }
+        .app { display: flex; flex-direction: column; height: 100vh; }
         
         .header { 
           padding: 12px 16px 0;
@@ -783,22 +783,22 @@ const willBeVisited = !loc.visited;
 
   .body {
     flex-direction: column;
+    height: calc(100vh - 110px); /* header + status approx */
   }
 
   .right-panel {
-    height: 40%;
+    flex: 1;
   }
 
   .left-panel {
+    flex: 1;
     position: relative;
     width: 100%;
-    height: 60%;
     border-right: none;
     border-top: 1px solid #1e2633;
-    transform: none;
   }
 
-} 2px; margin-top: 4px; display: inline-block; }
+}
       `}</style>
 
       {/* Load Leaflet */}
