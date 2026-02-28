@@ -599,6 +599,7 @@ const willBeVisited = !loc.visited;
           flex-direction: column;
           overflow: hidden;
           flex-shrink: 0;
+          min-height: 0;
         }
         
         .panel-section {
@@ -853,6 +854,26 @@ const willBeVisited = !loc.visited;
         </div>
 
         <div className="body" style={{ position: "relative" }}>
+          {/* MAP PANEL */}
+          <div className={`right-panel ${mapFullscreen ? "fullscreen" : ""}`}>
+            <MapView
+              locations={sortedLocs}
+              route={currentDay.routeGeometry}
+              onToggleVisited={toggleVisited}
+            />
+            <button
+              onClick={() => setMapFullscreen(v => !v)}
+              style={{
+                position: "absolute", top: 10, right: 10, zIndex: 1000,
+                background: "#0c0f14", border: "1px solid #f97316",
+                color: "#f97316", borderRadius: 6, padding: "5px 10px",
+                fontFamily: "'DM Mono', monospace", fontSize: 11,
+                cursor: "pointer"
+              }}
+            >
+              {mapFullscreen ? "✕ Exit" : "⤢ Full"}
+            </button>
+          </div>
           {/* LEFT PANEL */}
           <div className={`left-panel ${mobileView === "map" ? "hidden" : ""}`}>
             {/* ADD LOCATION */}
@@ -983,27 +1004,6 @@ const willBeVisited = !loc.visited;
               )}
             </div>
           </div>
-
-          {/* MAP PANEL */}
-          <div className={`right-panel ${mapFullscreen ? "fullscreen" : ""}`}>
-  <MapView
-    locations={sortedLocs}
-    route={currentDay.routeGeometry}
-    onToggleVisited={toggleVisited}
-  />
-  <button
-    onClick={() => setMapFullscreen(v => !v)}
-    style={{
-      position: "absolute", top: 10, right: 10, zIndex: 1000,
-      background: "#0c0f14", border: "1px solid #f97316",
-      color: "#f97316", borderRadius: 6, padding: "5px 10px",
-      fontFamily: "'DM Mono', monospace", fontSize: 11,
-      cursor: "pointer"
-    }}
-  >
-    {mapFullscreen ? "✕ Exit" : "⤢ Full"}
-  </button>
-</div>
         </div>
       </div>
     </>
