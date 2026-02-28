@@ -226,6 +226,16 @@ export default function App() {
   const [dbReady, setDbReady] = useState(false);
   const [mapFullscreen, setMapFullscreen] = useState(false);
   const [activeTab, setActiveTab] = useState("list");
+  const [homeAddress, setHomeAddress] = useState(() => localStorage.getItem("frp_home") || "");
+const [officeAddress, setOfficeAddress] = useState(() => localStorage.getItem("frp_office") || "");
+const [homeCoords, setHomeCoords] = useState(() => {
+  const s = localStorage.getItem("frp_home_coords");
+  return s ? JSON.parse(s) : null;
+});
+const [officeCoords, setOfficeCoords] = useState(() => {
+  const s = localStorage.getItem("frp_office_coords");
+  return s ? JSON.parse(s) : null;
+});
 
   useEffect(() => {
     loadAllDays().then(rows => {
@@ -258,7 +268,26 @@ export default function App() {
       return updated;
     });
   }, [activeDay]);
-
+  const saveHomeOffice = async (type, address) => {
+  setStatus(`Geocoding ${type}...`);
+  try {
+    const geo = await geocodeAddress(address);
+    const coords = { lat: geo.lat, lng: geo.lng };
+    if (type === "home") {
+      setHomeCoords(coords);
+      localStorage.setItem("frp_home", address);
+      localStorage.setItem("frp_home_coords", JSON.stringify(coords));
+      setStatus("✓ Home saved");
+    } else {
+      setOfficeCoords(coords);
+      localStorage.setItem("frp_office", address);
+      localStorage.setItem("frp_office_coords", JSON.stringify(coords));
+      setStatus("✓ Office saved");
+    }
+  } catch (e) {
+    setStatus(`✗ Could not find ${type} address`);
+  }
+};
   const navigateNextStop = () => {
     const next = sortedLocs.find(l => !l.visited);
     if (!next) { setStatus("✓ All locations completed!"); return; }
@@ -304,17 +333,53 @@ export default function App() {
   };
 
   const optimizeRoute = async () => {
-    const locs = currentDay.locations;
-    if (locs.length < 2) { setStatus("Need at least 2 locations"); return; }
+    const middleLocs = currentDay.locations;
+if (middleLocs.length < 1) { setStatus("Need at least 1 location"); return; }
+
+const startLoc = homeCoords ? { id: "__home__", name: "🏠 Home", address: homeAddress, lat: homeCoords.lat, lng: homeCoords.lng, visited: false, optimizedIndex: undefined } : null;
+const endLoc = officeCoords ? { id: "__office__", name: "🏢 Office", address: officeAddress, lat: officeCoords.lat, lng: officeCoords.lng, visited: false, optimizedIndex: undefined } : null;
+
+const locs = [
+  ...(startLoc ? [startLoc] : []),
+  ...middleLocs,
+  ...(endLoc ? [endLoc] : []),
+];
     setOptimizing(true); setStatus("Building distance matrix...");
     try {
       const matrix = await getDistanceMatrix(locs);
       setStatus("Solving optimal route...");
-      const { order, totalTime } = solveTSP(matrix);
+      let order, totalTime;
+
+if (startLoc && endLoc && middleLocs.length >= 1) {
+  const n = middleLocs.length;
+  const subMatrix = matrix.slice(1, 1 + n).map(row => row.slice(1, 1 + n));
+  let bestMiddle = Array.from({ length: n }, (_, i) => i);
+  let bestTime = Infinity;
+
+  for (let start = 0; start < n; start++) {
+    const vis = new Array(n).fill(false);
+    const ord = [start]; vis[start] = true; let cur = start, t = 0;
+    for (let i = 1; i < n; i++) {
+      let near = -1, nearD = Infinity;
+      for (let j = 0; j < n; j++) {
+        if (!vis[j] && subMatrix[cur][j] < nearD) { nearD = subMatrix[cur][j]; near = j; }
+      }
+      if (near === -1) break;
+      vis[near] = true; ord.push(near); t += nearD; cur = near;
+    }
+    const totalCost = matrix[0][ord[0] + 1] + t + matrix[ord[ord.length - 1] + 1][locs.length - 1];
+    if (totalCost < bestTime) { bestTime = totalCost; bestMiddle = [...ord]; }
+  }
+
+  order = [0, ...bestMiddle.map(i => i + 1), locs.length - 1];
+  totalTime = bestTime;
+} else {
+  ({ order, totalTime } = solveTSP(matrix));
+}
       const orderedLocs = order.map((idx, pos) => ({ ...locs[idx], optimizedIndex: pos }));
+const indexMap = Object.fromEntries(orderedLocs.map(l => [l.id, l.optimizedIndex]));
       setStatus("Fetching route path...");
       const routeData = await getRouteGeometry(orderedLocs);
-      const indexMap = Object.fromEntries(orderedLocs.map(l => [l.id, l.optimizedIndex]));
       updateCurrentDay(d => ({
         ...d,
         locations: d.locations.map(l => indexMap[l.id] !== undefined ? { ...l, optimizedIndex: indexMap[l.id] } : l),
@@ -505,6 +570,9 @@ export default function App() {
             <button className={`panel-tab ${activeTab === "add" ? "active" : ""}`} onClick={() => setActiveTab("add")}>
               + Add Stop
             </button>
+            <button className={`panel-tab ${activeTab === "settings" ? "active" : ""}`} onClick={() => setActiveTab("settings")}>
+  ⚙ Routes
+</button>
           </div>
 
           <div className="scroll-area">
@@ -533,7 +601,23 @@ export default function App() {
                 ))}
               </div>
             )}
+{activeTab === "settings" && (
+  <div className="add-form">
+    <div style={{ fontSize: 11, color: "#4b5563", fontFamily: "'DM Mono',monospace", marginBottom: 4 }}>🏠 HOME — Start Point</div>
+    <input className="field" placeholder="Your home address" value={homeAddress} onChange={e => setHomeAddress(e.target.value)} />
+    <button className="btn-add" onClick={() => saveHomeOffice("home", homeAddress)} disabled={!homeAddress.trim()}>
+      Save Home
+    </button>
+    {homeCoords && <div style={{ fontSize: 10, color: "#22c55e", fontFamily: "'DM Mono',monospace" }}>✓ Saved: {homeAddress}</div>}
 
+    <div style={{ fontSize: 11, color: "#4b5563", fontFamily: "'DM Mono',monospace", marginBottom: 4, marginTop: 12 }}>🏢 OFFICE — End Point</div>
+    <input className="field" placeholder="Your office address" value={officeAddress} onChange={e => setOfficeAddress(e.target.value)} />
+    <button className="btn-add" onClick={() => saveHomeOffice("office", officeAddress)} disabled={!officeAddress.trim()}>
+      Save Office
+    </button>
+    {officeCoords && <div style={{ fontSize: 10, color: "#22c55e", fontFamily: "'DM Mono',monospace" }}>✓ Saved: {officeAddress}</div>}
+  </div>
+)}
             {activeTab === "add" && (
               <div className="add-form">
                 <input className="field" placeholder="Shop / party name (optional)" value={nameInput} onChange={e => setNameInput(e.target.value)} />
