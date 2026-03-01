@@ -274,7 +274,9 @@ const totalStopsCount = currentDay.locations.length
   const updateCurrentDay = useCallback((updater) => {
     setDayData(prev => {
       const updated = { ...prev, [activeDay]: updater(prev[activeDay]) };
-      saveDay({ ...updated[activeDay], updatedAt: new Date().toISOString() }).catch(console.error);
+      saveDay({ ...updated[activeDay], updatedAt: new Date().toISOString() })
+  .then(() => console.log("✓ Saved day", activeDay))
+  .catch(e => console.error("✗ Save failed", e));
       return updated;
     });
   }, [activeDay]);
@@ -699,11 +701,11 @@ if (startLoc && endLoc && middleLocs.length >= 1) {
   <div className="add-form">
     <div style={{ fontSize: 11, color: "#4b5563", fontFamily: "'DM Mono',monospace", marginBottom: 4 }}>🟢 START POINT</div>
     <input className="field" placeholder="Home address or paste Google Maps link" value={homeAddress} onChange={e => setHomeAddress(e.target.value)} />
-    <button className="btn-add" onClick={() => saveHomeOffice("home", homeAddress)} disabled={!homeAddress.trim()}>Save Home</button>
+    <button className="btn-add" onClick={() => saveHomeOffice("home", homeAddress)} disabled={!homeAddress.trim()}>Save Start Point</button>
     {homeCoords && <div style={{ fontSize: 10, color: "#22c55e", fontFamily: "'DM Mono',monospace" }}>✓ Saved: {homeAddress.substring(0, 40)}</div>}
     <div style={{ fontSize: 11, color: "#4b5563", fontFamily: "'DM Mono',monospace", marginBottom: 4, marginTop: 12 }}>🔴 END POINT</div>
     <input className="field" placeholder="Office address or paste Google Maps link" value={officeAddress} onChange={e => setOfficeAddress(e.target.value)} />
-    <button className="btn-add" onClick={() => saveHomeOffice("office", officeAddress)} disabled={!officeAddress.trim()}>Save Office</button>
+    <button className="btn-add" onClick={() => saveHomeOffice("office", officeAddress)} disabled={!officeAddress.trim()}>Save End Point</button>
     {officeCoords && <div style={{ fontSize: 10, color: "#22c55e", fontFamily: "'DM Mono',monospace" }}>✓ Saved: {officeAddress.substring(0, 40)}</div>}
   </div>
 )}
