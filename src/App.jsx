@@ -453,6 +453,8 @@ if (startLoc && endLoc && middleLocs.length >= 1) {
     }
 
       const orderedLocs = order.map((idx, pos) => ({ ...locs[idx], optimizedIndex: pos }));
+console.log("ORDER:", order);
+console.log("ORDERED LOCS:", orderedLocs.map(l => `${l.name}(${l.optimizedIndex})`));
       const indexMap = Object.fromEntries(orderedLocs.map(l => [l.id, l.optimizedIndex]));
       setStatus("Fetching route path...");
       const routeData = await getRouteGeometry(orderedLocs);
