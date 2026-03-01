@@ -169,9 +169,11 @@ function MapView({ locations, route, onToggleVisited, isFullscreen }) {
 
     const bounds = [];
     locations.forEach((loc, idx) => {
-      const color = loc.visited ? "#22c55e" : "#f97316";
-      const border = loc.visited ? "#16a34a" : "#ea580c";
-      const num = loc.optimizedIndex !== undefined ? loc.optimizedIndex + 1 : idx + 1;
+      const isStart = loc.id === "__home__";
+const isEnd = loc.id === "__office__";
+const color = isStart ? "#22c55e" : isEnd ? "#ef4444" : loc.visited ? "#22c55e" : "#f97316";
+const border = isStart ? "#16a34a" : isEnd ? "#b91c1c" : loc.visited ? "#16a34a" : "#ea580c";
+const num = isStart ? "S" : isEnd ? "E" : loc.optimizedIndex !== undefined ? loc.optimizedIndex + 1 : idx + 1;
       const icon = L.divIcon({
         className: "",
         html: `<div style="width:34px;height:34px;background:${color};border:3px solid ${border};border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,0.5);">
@@ -371,29 +373,83 @@ const locs = [...(startLoc ? [startLoc] : []), ...middleLocs, ...(endLoc ? [endL
       setStatus("Solving optimal route...");
       let order, totalTime;
 if (startLoc && endLoc && middleLocs.length >= 1) {
+  // locs = [home(0), ...middle(1..n), office(n+1)]
   const n = middleLocs.length;
-  const subMatrix = matrix.slice(1, 1 + n).map(row => row.slice(1, 1 + n));
+  const officeIdx = n + 1;
+
+  // Build submatrix for middle stops only (indices 1..n in full matrix)
+  const subMatrix = Array.from({ length: n }, (_, i) =>
+    Array.from({ length: n }, (_, j) => matrix[i + 1][j + 1])
+  );
+
   let bestMiddle = Array.from({ length: n }, (_, i) => i);
-  let bestTime = Infinity;
+  let bestCost = Infinity;
+
+  // Try nearest neighbor from each middle stop as first visited
+  for (let s = 0; s < n; s++) {
+    const vis = new Array(n).fill(false);
+    const ord = [s];
+    vis[s] = true;
+    let cur = s;
+    let t = 0;
+
+    for (let i = 1; i < n; i++) {
+      let near = -1, nearD = Infinity;
+      for (let j = 0; j < n; j++) {
+        if (!vis[j] && subMatrix[cur][j] < nearD) {
+          nearD = subMatrix[cur][j];
+          near = j;
+        }
+      }
+      if (near === -1) break;
+      vis[near] = true;
+      ord.push(near);
+      t += nearD;
+      cur = near;
+    }
+
+    // Total cost = home→first_stop + middle route + last_stop→office
+    const homeCost = matrix[0][ord[0] + 1];
+    const officeCost = matrix[ord[ord.length - 1] + 1][officeIdx];
+    const totalCost = homeCost + t + officeCost;
+
+    if (totalCost < bestCost) {
+      bestCost = totalCost;
+      bestMiddle = [...ord];
+    }
+  }
+
+  // Map back: 0=home, middle+1 offset, officeIdx=last
+  order = [0, ...bestMiddle.map(i => i + 1), officeIdx];
+  totalTime = bestCost;
+
+} else if (startLoc && !endLoc && middleLocs.length >= 1) {
+  // Only home set, no office — fix home as start, TSP rest
+  const n = middleLocs.length;
+  let bestMiddle = Array.from({ length: n }, (_, i) => i);
+  let bestCost = Infinity;
+
   for (let s = 0; s < n; s++) {
     const vis = new Array(n).fill(false);
     const ord = [s]; vis[s] = true; let cur = s, t = 0;
     for (let i = 1; i < n; i++) {
       let near = -1, nearD = Infinity;
       for (let j = 0; j < n; j++) {
-        if (!vis[j] && subMatrix[cur][j] < nearD) { nearD = subMatrix[cur][j]; near = j; }
+        if (!vis[j] && matrix[cur + 1][j + 1] < nearD) { nearD = matrix[cur + 1][j + 1]; near = j; }
       }
       if (near === -1) break;
       vis[near] = true; ord.push(near); t += nearD; cur = near;
     }
-    const cost = matrix[0][ord[0] + 1] + t + matrix[ord[ord.length - 1] + 1][locs.length - 1];
-    if (cost < bestTime) { bestTime = cost; bestMiddle = [...ord]; }
+    const totalCost = matrix[0][ord[0] + 1] + t;
+    if (totalCost < bestCost) { bestCost = totalCost; bestMiddle = [...ord]; }
   }
-  order = [0, ...bestMiddle.map(i => i + 1), locs.length - 1];
-  totalTime = bestTime;
-} else {
-  ({ order, totalTime } = solveTSP(matrix));
-}
+  order = [0, ...bestMiddle.map(i => i + 1)];
+      totalTime = bestCost;
+
+    } else {
+      ({ order, totalTime } = solveTSP(matrix));
+    }
+
       const orderedLocs = order.map((idx, pos) => ({ ...locs[idx], optimizedIndex: pos }));
       const indexMap = Object.fromEntries(orderedLocs.map(l => [l.id, l.optimizedIndex]));
       setStatus("Fetching route path...");
@@ -641,11 +697,11 @@ if (startLoc && endLoc && middleLocs.length >= 1) {
             )}
             {activeTab === "settings" && (
   <div className="add-form">
-    <div style={{ fontSize: 11, color: "#4b5563", fontFamily: "'DM Mono',monospace", marginBottom: 4 }}>🏠 HOME — Start Point</div>
+    <div style={{ fontSize: 11, color: "#4b5563", fontFamily: "'DM Mono',monospace", marginBottom: 4 }}>🟢 START POINT</div>
     <input className="field" placeholder="Home address or paste Google Maps link" value={homeAddress} onChange={e => setHomeAddress(e.target.value)} />
     <button className="btn-add" onClick={() => saveHomeOffice("home", homeAddress)} disabled={!homeAddress.trim()}>Save Home</button>
     {homeCoords && <div style={{ fontSize: 10, color: "#22c55e", fontFamily: "'DM Mono',monospace" }}>✓ Saved: {homeAddress.substring(0, 40)}</div>}
-    <div style={{ fontSize: 11, color: "#4b5563", fontFamily: "'DM Mono',monospace", marginBottom: 4, marginTop: 12 }}>🏢 OFFICE — End Point</div>
+    <div style={{ fontSize: 11, color: "#4b5563", fontFamily: "'DM Mono',monospace", marginBottom: 4, marginTop: 12 }}>🔴 END POINT</div>
     <input className="field" placeholder="Office address or paste Google Maps link" value={officeAddress} onChange={e => setOfficeAddress(e.target.value)} />
     <button className="btn-add" onClick={() => saveHomeOffice("office", officeAddress)} disabled={!officeAddress.trim()}>Save Office</button>
     {officeCoords && <div style={{ fontSize: 10, color: "#22c55e", fontFamily: "'DM Mono',monospace" }}>✓ Saved: {officeAddress.substring(0, 40)}</div>}
