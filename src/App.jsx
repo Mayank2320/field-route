@@ -310,10 +310,10 @@ const totalStopsCount = currentDay.locations.length
   } catch (e) { setStatus(`✗ ${e.message}`); }
 };
   const navigateNextStop = () => {
-    const next = sortedLocs.find(l => !l.visited);
-    if (!next) { setStatus("✓ All locations completed!"); return; }
-    window.open(`https://www.google.com/maps/dir/?api=1&destination=${next.lat},${next.lng}&travelmode=driving`, "_blank");
-  };
+  const next = sortedLocs.find(l => !l.visited && l.id !== "__home__" && l.id !== "__office__");
+  if (!next) { setStatus("✓ All locations completed!"); return; }
+  window.open(`https://www.google.com/maps/dir/?api=1&destination=${next.lat},${next.lng}&travelmode=driving`, "_blank");
+};
 
   const addLocation = async () => {
     const addr = addressInput.trim();
@@ -366,8 +366,8 @@ const totalStopsCount = currentDay.locations.length
   const optimizeRoute = async () => {
     const middleLocs = currentDay.locations;
 if (middleLocs.length < 1) { setStatus("Need at least 1 location"); return; }
-const startLoc = homeCoords ? { id: "__home__", name: "🏠 Home", address: homeAddress, lat: homeCoords.lat, lng: homeCoords.lng, visited: false, optimizedIndex: undefined } : null;
-const endLoc = officeCoords ? { id: "__office__", name: "🏢 Office", address: officeAddress, lat: officeCoords.lat, lng: officeCoords.lng, visited: false, optimizedIndex: undefined } : null;
+const startLoc = homeCoords ? { id: "__home__", name: "Start Point", address: homeAddress, lat: homeCoords.lat, lng: homeCoords.lng, visited: false, optimizedIndex: undefined } : null;
+const endLoc = officeCoords ? { id: "__office__", name: "End Point", address: officeAddress, lat: officeCoords.lat, lng: officeCoords.lng, visited: false, optimizedIndex: undefined } : null;
 const locs = [...(startLoc ? [startLoc] : []), ...middleLocs, ...(endLoc ? [endLoc] : [])];
     setOptimizing(true); setStatus("Building distance matrix...");
     try {
@@ -636,7 +636,7 @@ if (startLoc && endLoc && middleLocs.length >= 1) {
           </div>
 
           <div className="action-bar">
-            <button className="btn-optimize" onClick={optimizeRoute} disabled={optimizing || currentDay.locations.length < 2}>
+            <button className="btn-optimize" onClick={optimizeRoute} disabled={optimizing || currentDay.locations.length < 1}>
               {optimizing ? "Optimizing..." : "⚡ Optimize Route"}
             </button>
             {currentDay.optimizedOrder && (
@@ -672,11 +672,11 @@ if (startLoc && endLoc && middleLocs.length >= 1) {
       style={isFixed ? { borderColor: "#3b4a6b", background: "#0e1628" } : {}}>
       <div className="loc-num"
         style={isFixed ? { background: "#3b82f6", fontSize: 9 } : {}}>
-        {loc.id === "__home__" ? "🏠" : loc.id === "__office__" ? "🏢" : idx + 1}
+        {loc.id === "__home__" ? "S" : loc.id === "__office__" ? "E" : idx + 1}
       </div>
       <div className="loc-info">
         <div className="loc-name">{loc.name}</div>
-        <div className="loc-addr">{isFixed ? "Fixed point" : loc.address}</div>
+        <div className="loc-addr">{loc.id === "__home__" ? "Start Point" : loc.id === "__office__" ? "End Point" : loc.address}</div>
       </div>
       <div className="loc-actions">
         {!isFixed && (
